@@ -28,6 +28,7 @@
 #include <netinet/in.h>
 
 #define PING_PKT_S 8192 // max ping size but irl max is 8184
+#define test 11
 
 
 
@@ -37,6 +38,7 @@
 #define ICMP_ECHOREPLY          0               /* echo reply */
 #define ICMP_UNREACH            3               /* dest unreachable, codes: */
 #define ICMP_TIMXCEED           11              /* time exceeded, code: */
+#define FQDN_SIZE 256
 
 
 struct s_icmphdr
@@ -135,8 +137,12 @@ struct                  s_count_flag{
   short                 enabler;
   long long             value;
 };
-typedef struct          s_ping{
+typedef struct          s_tR{
     int                 pong; // ping.pong comtroled by signal
+    int                 max_hops;
+    int                 hop;
+    int                 last_hop;
+    NetIpHdr            *r_ipHdr;
     int                 sockfd;
     int                 verbose;
     int                 sent_count;
@@ -150,8 +156,10 @@ typedef struct          s_ping{
     size_t              sizeof_pkt;
     char                *host_av_addr;
     char                ipStr[INET_ADDRSTRLEN];
+    char                fqdn[FQDN_SIZE];
     u_int16_t           s_seq;
     u_int16_t           pid;
+    u_int32_t           last_addr;
     double              rtt_stats[3]; // 0 min, 1 max, 2 total to calculate avg
     struct ping_pkt     s_pkt;
     struct ping_pkt     *r_pkt;
@@ -173,6 +181,6 @@ typedef struct          s_ping{
                                     //    time_t  tv_sec;
                                     //    suseconds_t  tv_usec;
                                     // };
-}                       t_ping;
+}                       t_tR;
 
 #endif
