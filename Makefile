@@ -11,7 +11,7 @@ all: $(FT_LIB) $(NAME)
 $(FT_LIB): 
 	@make -C  ./libft
 
-$(OBJ): $(P_HEADER)
+$(OBJ): $(SRC) $(P_HEADER)
 	gcc $(CFLAGS) -c $(SRC) -o $(OBJ)
 	
 

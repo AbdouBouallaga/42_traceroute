@@ -97,43 +97,40 @@ void    prepare_s_pkt(){
     tR.s_pkt.hdr.checksum = checksum(&tR.s_pkt, tR.sizeof_pkt);
 }
 
-void    hexToIp(uint8_t *ip){
-    int i = -1;
-    int j = 0;
-    char *out = ft_strnew(16);
-    ft_bzero(out, 16);
-    while(++i < 4){
-        // out[j] = ft_itoa_base(ip[i], 16);
-        printf("%x\n", ip[i]);
-        // printf("%s\n", ft_itoa_base(ip[i], 16));
-        // out[j+3] = '.';
-        // j += 4;
-    }
-}
-
 
 void    trace_write(){
-    uint8_t             *r_ip;
+    uint8_t *r_ip;
+    char    *tmp;        
     char ip[INET_ADDRSTRLEN];
+    struct addrinfo addrInfotmp;
+    struct addrinfo *addrptr;
+    addrptr = &addrInfotmp;
     ft_bzero(ip, INET_ADDRSTRLEN);
     if (tR.last_addr != tR.r_ipHdr->src_addr){
         r_ip = (uint8_t *)&tR.r_ipHdr->src_addr;
         tR.last_addr = tR.r_ipHdr->src_addr;
-        // printf("\n");
-        hexToIp(r_ip);
-        // printf("ip == %s\n", ip);
-        // getaddrinfo((uint32_t *)&tR.r_ipHdr->src_addr, NULL, NULL, &tR.addrInfo);
-
-        // ft_bzero(&tR.fqdn, sizeof(tR.fqdn));
-        // inet_pton(AF_INET, (const char *)r_ip, &tR.last_addr);
-        // getnameinfo((struct sockaddr*)tR.addrInfo->ai_addr,sizeof(tR.addrInfo->ai_addr),tR.fqdn,sizeof(tR.fqdn),0,0,0);
+        int i = -1;
+        while(++i < 4){
+            tmp = ft_itoa(r_ip[i]);
+            ft_strcat(ip, tmp);
+            free(tmp);
+            if (i < 3)
+                ft_strcat(ip, ".");
+        }
+        int p = getaddrinfo(ip, NULL, NULL, &addrptr);
+        ft_bzero(&tR.fqdn, sizeof(tR.fqdn));
+        int y = getnameinfo(addrptr->ai_addr,sizeof(struct sockaddr),tR.fqdn,sizeof(tR.fqdn),0,0,0);
+        if (y != 0){
+            printf("getnameinfo failed %s\n", gai_strerror(y));
+            exit(1);
+        }
         if (tR.hop == tR.last_hop)
             printf("\n  ");
         else {
             tR.last_hop = tR.hop;
             printf(" %d", tR.hop);
         }
-        printf("  %s(%d.%d.%d.%d)", tR.fqdn, r_ip[0], r_ip[1], r_ip[2], r_ip[3]);
+        printf(" %s (%d.%d.%d.%d)", tR.fqdn, r_ip[0], r_ip[1], r_ip[2], r_ip[3]);
         while (tR.errors){
             printf("  *");
             tR.errors--;
@@ -159,9 +156,7 @@ void    pingPong(){
     tR.sent_count++;
     int snt = sendto(tR.sockfd, &tR.s_pkt, (size_t)tR.sizeof_pkt, 0, tR.addrInfo->ai_addr, sizeof(*tR.addrInfo->ai_addr));
     if (snt == -1){
-        // tR.sent_count--;
-        if (tR.verbose)
-            printf("sendto : %s\n", strerror(errno));
+        printf("sendto : %s\n", strerror(errno));
         goto out;
     }
 
@@ -250,9 +245,7 @@ int ft_itsdigit(char *str){
 }
 
 int main(int ac, char **av){
-    int e = test;
-    printf("%d\n", e);
-    exit(1);
+
     int i; // av index
     int dns; // dns check and msg fill
     struct addrinfo hints;
@@ -320,7 +313,7 @@ int main(int ac, char **av){
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_RAW;
     hints.ai_protocol = IPPROTO_ICMP;
-    hints.ai_flags = AI_DEFAULT;
+    // hints.ai_flags = AI_DEFAULT;
     // dns check
     dns = getaddrinfo(av[i], NULL, &hints, &tR.addrInfo);
     if (dns != 0){
