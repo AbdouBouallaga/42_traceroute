@@ -6,6 +6,7 @@ CFLAGS	=
 P_HEADER = ./inc/ft_traceroute.h
 FT_LIB = ./libft/libft.a
 
+
 all: $(FT_LIB) $(NAME)
 
 $(FT_LIB): 
