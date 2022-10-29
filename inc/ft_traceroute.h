@@ -40,6 +40,13 @@
 #define ICMP_TIMXCEED           11              /* time exceeded, code: */
 #define FQDN_SIZE 256
 
+struct s_udphdr
+{
+    u_int16_t source_port;
+    u_int16_t dest_port;
+    u_int16_t len;
+    u_int16_t check;
+};
 
 struct s_icmphdr
 {
@@ -89,8 +96,8 @@ typedef struct
 
 /////////////////////////////////////////////////////////
 
-struct   ping_pkt{
-    struct s_icmphdr hdr;
+struct   pkt{
+    struct s_icmphdr hdr; // or cast to udp header, both are 8 bytes
     char msg[PING_PKT_S-sizeof(struct s_icmphdr)];
 };
 
@@ -142,8 +149,11 @@ typedef struct          s_tR{
     int                 max_hops;
     int                 hop;
     int                 last_hop;
+    short               protocol; // 0 = icmp, 1 = udp
     NetIpHdr            *r_ipHdr;
-    int                 sockfd;
+    int                 sockfd_send_proto;
+    int                 sockfd_send;
+    int                 sockfd_recv;
     int                 verbose;
     int                 sent_count;
     int                 rcev_count;
@@ -161,8 +171,8 @@ typedef struct          s_tR{
     u_int16_t           pid;
     u_int32_t           last_addr;
     double              rtt_stats[3]; // 0 min, 1 max, 2 total to calculate avg
-    struct ping_pkt     s_pkt;
-    struct ping_pkt     *r_pkt;
+    struct pkt     s_pkt;
+    struct pkt     *r_pkt;
     struct msghdr       r_msg;
     struct addrinfo     addrInfoStruct; // struct addrinfo {
                                         //    int              ai_flags;
