@@ -179,7 +179,7 @@ void    pingPong(){
     int loop;
     int rcv;
     int wind = 0;
-
+    NetIpHdr            *temp_ipHdr;
     // NetIpHdr *r_ipHdr;
     // uint8_t *r_ip; // uint32_t / 4, x.x.x.x
     if (tR.protocol)
@@ -192,13 +192,8 @@ void    pingPong(){
     // get send time
     gettimeofday(&tR.timeCount[0].Timeval, NULL);
     // send the packet
-    tR.sent_count++;
-    int debug = 5;
     int snt = 0;
-    while (debug){
-        snt = sendto(tR.sockfd_send, &tR.s_pkt, (size_t)tR.sizeof_pkt, 0, tR.addrInfo->ai_addr, sizeof(*tR.addrInfo->ai_addr));
-        debug--;
-    }
+    snt = sendto(tR.sockfd_send, &tR.s_pkt, (size_t)tR.sizeof_pkt, 0, tR.addrInfo->ai_addr, sizeof(*tR.addrInfo->ai_addr));
     if (snt == -1){
         printf("sendto : %s\n", strerror(errno));
         goto out;
@@ -208,12 +203,8 @@ void    pingPong(){
 
     loop = 1;
 
-    while (loop){ // to ignore all indesired icmp packets
+    while (loop){ // to ignore all indesired icmp packets  >> if (tR.r_pkt->hdr.un.echo.id != tR.s_pkt.hdr.un.echo.id){
         rcv = recvfrom(tR.sockfd_recv, &msg, sizeof(msg), 0, NULL, NULL);
-        printf("rcv = %d\n", rcv);
-        if (rcv == -1){
-            rcv = recvfrom(tR.sockfd_send, &msg, sizeof(msg), 0, NULL, NULL);
-            printf("rcv snt = %d\n", rcv);
             if (rcv == -1){
                 tR.errors++;
                 if (tR.errors > 2){
@@ -222,16 +213,14 @@ void    pingPong(){
                 }
                 loop = 0;
             }
-        }
+        // }
         else {
             tR.r_ipHdr = (NetIpHdr *)msg;
             tR.r_pkt = (struct pkt *)&msg[sizeof(NetIpHdr)];
-            // tR.r_ip = (uint8_t *)&tR.r_ipHdr->src_addr;
-            // printf("type %d\n", tR.r_pkt->hdr.type);
             gettimeofday(&tR.timeCount[1].Timeval, NULL);
             double time = (tR.timeCount[1].Timeval.tv_usec - tR.timeCount[0].Timeval.tv_usec)/1000.0+(tR.timeCount[1].Timeval.tv_sec - tR.timeCount[0].Timeval.tv_sec)*1000.0;
             statsSave(time);
-            if (tR.r_pkt->hdr.type == ICMP_ECHOREPLY && tR.protocol == 0){
+            if (tR.r_pkt->hdr.type == ICMP_ECHOREPLY){
                 if(tR.max_hops > 3)
                     tR.max_hops = 3;
                 if (tR.r_pkt->hdr.un.echo.id != tR.s_pkt.hdr.un.echo.id){
@@ -251,13 +240,17 @@ void    pingPong(){
                 loop = 0;
             }
             else {
-                printf("rcev %d\n", tR.r_pkt->hdr.type);
-                // printf("")
                 tR.r_pkt = (struct pkt *)&msg[(sizeof(NetIpHdr)*2+8)];
+                temp_ipHdr = (NetIpHdr *)&msg[(sizeof(NetIpHdr)+8)];
+                if (tR.r_ipHdr->src_addr == temp_ipHdr->dest_addr){
+                    if(tR.max_hops > 3)
+                        tR.max_hops = 3;
+                    tR.max_hops--;
+                }
                 if (tR.r_pkt->hdr.un.echo.id != tR.s_pkt.hdr.un.echo.id)
                     goto end;
                 trace_write();
-                printf("\t*");
+                printf("  %.3fms", time);
                 loop = 0;
             }
         end:
@@ -266,6 +259,7 @@ void    pingPong(){
     }
     out:
     tR.pong = 1;
+    // printf("ttl = %d ", tR.ttl);
 }
 
 void    usage(char *execName){
@@ -311,34 +305,6 @@ int main(int ac, char **av){
             tR.sockfd_send_proto = IPPROTO_ICMP;
             tR.msg_size = 56;
         }
-        else if (av[i][1] == 't' && ft_itsdigit(av[i+1])){
-            tR.ttl = ft_atoi(av[i+1]);
-            i++;
-        }
-        else if (av[i][1] == 'c' && ft_itsdigit(av[i+1])){
-            tR.count_flag.enabler = 1;
-            tR.count_flag.value = ft_atoll(av[i+1]) - 1;
-            if (tR.count_flag.value < 0 || tR.count_flag.value > LLONG_MAX){
-                printf("ping: invalid argument: '%lld': out of range: 1 <= value <= %lld\n",tR.count_flag.value + 1, LLONG_MAX);
-                exit(1);
-            }
-            i++;
-        }
-        else if (av[i][1] == 's' && ft_itsdigit(av[i+1])){
-            tR.msg_size = ft_atoi(av[i+1]);
-            i++;
-        }
-        else if (av[i][1] == 'W' && ft_itsdigit(av[i+1])){
-            tR.rcvTimeval.tv_sec = ft_atoi(av[i+1]);
-            i++;
-        }
-        else if (av[i][1] == 'i' && ft_itsdigit(av[i+1])){
-            tR.interval_flag = ft_atoi(av[i+1]);
-            i++;
-        }
-        else if (av[i][1] == 'f'){
-            tR.flood_flag = 1;
-        }
         else if (av[i][1] == 'h'){
             usage(av[0]);
         }
@@ -353,31 +319,12 @@ int main(int ac, char **av){
     }
     // set ping package size
     tR.sizeof_pkt = sizeof(tR.s_pkt)-sizeof(tR.s_pkt.msg) + tR.msg_size;
-    // hints init
-    ft_bzero(&hints, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_RAW;
-    // hints.ai_protocol = IPPROTO_ICMP;
-    // hints.ai_flags = AI_DEFAULT;
-    // dns check
-    dns = getaddrinfo(av[i], NULL, &hints, &tR.addrInfo);
+
+    dns = getaddrinfo(av[i], NULL, NULL, &tR.addrInfo);
     if (dns != 0){
         printf("%s: %s , <destination> error : %s\n", av[0], av[i], gai_strerror(dns));
         exit(1);
     }
-
-    // printf("tR.addrInfo->ai_canonname = %s\n", tR.addrInfo->ai_canonname);
-    // printf("tR.addrInfo->ai_addr->sa_data = %s\n", tR.addrInfo->ai_addr->sa_data);
-    // printf("tR.addrInfo->ai_addr->sa_family = %d\n", tR.addrInfo->ai_addr->sa_family);
-    // printf("tR.addrInfo->ai_addr->sa_len = %d\n", tR.addrInfo->ai_addr->sa_len);
-    // printf("tR.addrInfo->ai_addrlen = %d\n", tR.addrInfo->ai_addrlen);
-    // printf("tR.addrInfo->ai_canonname = %s\n", tR.addrInfo->ai_canonname);
-    // printf("tR.addrInfo->ai_family = %d\n", tR.addrInfo->ai_family);
-    // printf("tR.addrInfo->ai_flags = %d\n", tR.addrInfo->ai_flags);
-    // printf("tR.addrInfo->ai_next = %p\n", tR.addrInfo->ai_next);
-    // printf("tR.addrInfo->ai_protocol = %d\n", tR.addrInfo->ai_protocol);
-    // printf("tR.addrInfo->ai_socktype = %d\n", tR.addrInfo->ai_socktype);
-    // extract and print the ip address; networt to presentation
     inet_ntop(tR.addrInfo->ai_family, &((struct sockaddr_in *) tR.addrInfo->ai_addr)->sin_addr, tR.ipStr, INET_ADDRSTRLEN);
     tR.sockfd_send = socket(AF_INET, SOCK_RAW, tR.sockfd_send_proto);
     tR.sockfd_recv = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
@@ -397,7 +344,7 @@ int main(int ac, char **av){
         printf("setsockopt SO_RCVTIMEO %s\n", strerror(errno));
     }
     tR.host_av_addr = av[i]; // save the host name memory address
-    printf(">>>>>>>>>> ptoto is %d\n", tR.protocol);
+    printf(">>>>>>>>>> potato is %d\n", tR.protocol);
     printf("traceroute to %s (%s), %d hops max, %d byte packets\n", tR.host_av_addr, tR.ipStr, tR.max_hops, tR.sizeof_pkt);
     // gettimeofday(&tR.GlobaltimeCount[0].Timeval, NULL);
     signal(SIGINT, halt); // ctrl+c signal
