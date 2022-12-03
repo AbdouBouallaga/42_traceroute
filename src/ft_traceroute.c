@@ -70,7 +70,7 @@ void init_ping(){ // init ping struct
     tR.rcev_count = 0;
     tR.ttl = 1;
     ///
-    tR.max_hops = 64;
+    tR.max_hops = 29;
     tR.last_addr = 0;
     tR.hop = 1;
     tR.last_hop = 0;
@@ -263,9 +263,10 @@ void    pingPong(){
 }
 
 void    usage(char *execName){
-    printf("Usage:\n\t %s [options] <destination>\n", execName);
+    printf("Usage:\n\t %s [options] <host>\n", execName);
     printf("Options:\n");
-    printf("\t-v                 verbose output\n");
+    printf("\t-I  --icmp\t\t\t\tUse ICMP ECHO for tracerouting\n");
+    printf("\t-m max_ttl \t\t\tSet the max number of hops (max TTL to be\n\t\t\t\t\t\treached). Default is 30\n");
     exit(0);
 }
 
@@ -300,10 +301,18 @@ int main(int ac, char **av){
         if (av[i][1] == 'v'){
             tR.verbose = 1;
         }
-        if (av[i][1] == 'I'){
+        else if (av[i][1] == 'I' || !ft_strcmp(av[i], "-icmp")){
             tR.protocol = 0;
             tR.sockfd_send_proto = IPPROTO_ICMP;
             tR.msg_size = 56;
+        }
+        else if ((av[i][1] == 'm') && ft_itsdigit(av[i+1])){
+            tR.max_hops = ft_atoi(av[i+1])-1;
+            if (tR.max_hops< 0){
+                printf("first hop out of range\n");
+                exit(1);
+            }
+            i++;
         }
         else if (av[i][1] == 'h'){
             usage(av[0]);
@@ -344,8 +353,7 @@ int main(int ac, char **av){
         printf("setsockopt SO_RCVTIMEO %s\n", strerror(errno));
     }
     tR.host_av_addr = av[i]; // save the host name memory address
-    printf(">>>>>>>>>> potato is %d\n", tR.protocol);
-    printf("traceroute to %s (%s), %d hops max, %d byte packets\n", tR.host_av_addr, tR.ipStr, tR.max_hops, tR.sizeof_pkt);
+    printf("traceroute to %s (%s), %d hops max, %d byte packets\n", tR.host_av_addr, tR.ipStr, tR.max_hops+1, tR.sizeof_pkt);
     // gettimeofday(&tR.GlobaltimeCount[0].Timeval, NULL);
     signal(SIGINT, halt); // ctrl+c signal
     pingPong();
